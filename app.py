@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from datetime import datetime
 
 # --- Page Config ---
@@ -8,8 +7,8 @@ st.set_page_config(page_title="Stock Tracker Dashboard", layout="wide")
 
 # --- User Info ---
 user_name = "Ali"
-st.title(f"👋 Welcome back, {user_name}!")
-st.markdown("### 📈 Your Stock Portfolio Dashboard")
+st.title(f"Welcome back, {user_name}!")
+st.markdown("### Your Stock Portfolio Dashboard")
 
 # --- Initialize Session State ---
 if "trades" not in st.session_state:
@@ -101,34 +100,22 @@ def style_trades(df):
                 return 'color: green'
         return ''
 
-    def highlight_row(s):
-        if isinstance(s['P/L'], (int, float)):
-            if s['P/L'] < 0:
-                return ['background-color: #ffe6e6'] * len(s)
-            elif s['P/L'] > 0:
-                return ['background-color: #e6ffe6'] * len(s)
-        return [''] * len(s)
-
-    styled = (
-        df_main.style.format({
-            'Price': '${:,.2f}',
-            'Avg Cost': '${:,.2f}',
-            'Total': '${:,.2f}',
-            'P/L': '${:,.2f}'
-        })
-        .applymap(color_pl, subset=['P/L'])
-        .apply(highlight_row, axis=1)
-    )
+    styled = df_main.style.format({
+        'Price': '${:,.2f}',
+        'Avg Cost': '${:,.2f}',
+        'Total': '${:,.2f}',
+        'P/L': '${:,.2f}'
+    }).applymap(color_pl, subset=['P/L'])
 
     return styled, df_total
 
 # --- Trade Management Panel ---
-st.markdown("## 📝 Trade Management")
-col_add, col_delete = st.columns([2, 1])
+st.subheader("Trade Management")
+col_add, col_delete = st.columns([2, 1])  # wide add column
 
 # --- Add Trade Form ---
 with col_add.form("Add Trade"):
-    st.markdown("### ➕ Add a Trade")
+    st.markdown("### Add a Trade")
     symbol = st.text_input("Symbol").upper()
     trade_type = st.selectbox("Type", ["Buy", "Sell"])
     quantity = st.number_input("Quantity", min_value=1, step=1)
@@ -147,7 +134,7 @@ with col_add.form("Add Trade"):
 
 # --- Delete Trade Form ---
 with col_delete.form("Delete Trade"):
-    st.markdown("### 🗑️ Delete a Trade")
+    st.markdown("### Delete a Trade")
     if st.session_state.trades:
         delete_index = st.number_input(
             "Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1
@@ -158,10 +145,10 @@ with col_delete.form("Delete Trade"):
             st.warning(f"Deleted trade: {removed}")
     else:
         st.info("No trades to delete.")
-        st.form_submit_button("Delete Trade")  # dummy submit
+        st.form_submit_button("Delete Trade")  # dummy submit button
 
 # --- Manual Live Price Input ---
-st.markdown("## 💵 Update Live Prices")
+st.subheader("Update Live Prices")
 if st.session_state.trades:
     with st.form("Live Prices"):
         live_symbol = st.selectbox("Select Symbol", sorted(set(t["Symbol"] for t in st.session_state.trades)))
@@ -173,26 +160,12 @@ if st.session_state.trades:
 else:
     st.info("Add a trade first to update live prices.")
 
-# --- UPDATE TRADES & PORTFOLIO ---
+# --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 overview_df = portfolio_overview(holdings)
 
-# --- Summary Cards ---
-st.markdown("## 📦 Portfolio Summary")
-if not overview_df.empty:
-    total_value = overview_df["Current Value"].sum()
-    total_cost = overview_df["Current Cost"].sum()
-    total_pl = total_value - total_cost
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total Cost", f"${total_cost:,.2f}")
-    col2.metric("📈 Current Value", f"${total_value:,.2f}")
-    if total_pl >= 0:
-        col3.metric("✅ Unrealized P/L", f"${total_pl:,.2f}", f"🟢 +${total_pl:,.2f}")
-    else:
-        col3.metric("❌ Unrealized P/L", f"${total_pl:,.2f}", f"-${abs(total_pl):,.2f}", delta_color="normal")
-
-# --- Portfolio Dashboard Cards per Symbol ---
-st.markdown("## 📊 Portfolio Overview by Symbol")
+# --- Portfolio Dashboard Cards ---
+st.subheader("Portfolio Overview")
 if not overview_df.empty:
     for idx, row in overview_df.iterrows():
         col1, col2, col3, col4 = st.columns(4)
@@ -201,34 +174,20 @@ if not overview_df.empty:
         col3.metric(label="Current Cost", value=f"${row['Current Cost']:,.2f}")
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
+
         if unrealized_pl < 0:
-            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", f"-${abs(unrealized_pl):,.2f}", delta_color="normal")
+            delta_display = f"-${abs(unrealized_pl):,.2f}"
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
         elif unrealized_pl > 0:
-            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", f"🟢 ${unrealized_pl:,.2f}", delta_color="normal")
+            delta_display = f"🟢 ${unrealized_pl:,.2f}"
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
         else:
             col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", "$0.00", delta_color="off")
 else:
     st.info("No holdings yet.")
 
-# --- Portfolio Charts ---
-if not overview_df.empty:
-    st.markdown("## 📊 Charts")
-    chart_df = overview_df.copy()
-    chart_df = chart_df.melt(id_vars=["Symbol"], value_vars=["Current Cost", "Current Value"],
-                             var_name="Type", value_name="Amount")
-    fig = px.bar(chart_df, x="Symbol", y="Amount", color="Type", barmode="group",
-                 text_auto=".2s", title="Current Value vs Cost by Symbol")
-    st.plotly_chart(fig, use_container_width=True)
-
-    pl_data = []
-    for idx, row in overview_df.iterrows():
-        pl_data.append({"Symbol": row["Symbol"], "P/L": row["Current Value"] - row["Current Cost"]})
-    pl_df = pd.DataFrame(pl_data)
-    fig_pie = px.pie(pl_df, names="Symbol", values="P/L", title="Unrealized P/L Contribution")
-    st.plotly_chart(fig_pie, use_container_width=True)
-
 # --- Trades Table ---
-st.markdown("## 📝 Trades Table")
+st.subheader("Trades Table")
 if not trades_df.empty:
     styled_df, total_row = style_trades(trades_df)
     st.dataframe(styled_df, use_container_width=True, height=400)
@@ -241,4 +200,4 @@ else:
 # --- Download CSV ---
 if not trades_df.empty:
     csv = trades_df.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download CSV", csv, "trades.csv", "text/csv")
+    st.download_button("Download CSV", csv, "trades.csv", "text/csv")
