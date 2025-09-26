@@ -45,6 +45,7 @@ for stock in trades_df["Stock"].unique():
     buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
     sells = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Sell")].copy()
     
+    # Reduce remaining per buy lot
     for _, sell in sells.iterrows():
         qty_to_sell = sell["Quantity"]
         for bidx, buy in buys.iterrows():
@@ -57,23 +58,21 @@ for stock in trades_df["Stock"].unique():
                 buys.at[bidx, "Remaining"] = 0
     trades_df.loc[buys.index, "Remaining"] = buys["Remaining"]
 
-# Calculate average cost per ticker for remaining shares
-avg_cost_per_stock = {}
+# Calculate progressive average cost per row for each stock
+trades_df["Progressive Avg Cost"] = 0.0
+
 for stock in trades_df["Stock"].unique():
-    remaining_buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy") & (trades_df["Remaining"]>0)]
-    if not remaining_buys.empty:
-        avg_cost = ( (remaining_buys["Remaining"] * (remaining_buys["Price"] + remaining_buys["Brokerage"]/remaining_buys["Quantity"])).sum() / remaining_buys["Remaining"].sum() )
-    else:
-        avg_cost = 0
-    avg_cost_per_stock[stock] = round(avg_cost,2)
+    remaining_buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
+    total_qty = 0
+    total_cost = 0.0
+    for idx, row in remaining_buys.iterrows():
+        if row["Remaining"] > 0:
+            lot_qty = row["Remaining"]
+            lot_cost = lot_qty * (row["Price"] + row["Brokerage"]/row["Quantity"])
+            total_qty += lot_qty
+            total_cost += lot_cost
+            trades_df.at[idx, "Progressive Avg Cost"] = total_cost / total_qty
+        else:
+            trades_df.at[idx, "Progressive Avg Cost"] = 0.0
 
-# Display table
-trades_df["Average Cost per Stock"] = trades_df["Stock"].map(avg_cost_per_stock)
 st.table(trades_df)
-
-# Portfolio Metrics
-st.header("Portfolio Analytics")
-total_invested = sum(
-    trades_df[trades_df["Action"]=="Buy"]["Remaining"] * trades_df[trades_df["Action"]=="Buy"]["Price"]
-)
-st.metric("Total Invested", f"${total_invested:,.2f}")
