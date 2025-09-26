@@ -164,15 +164,22 @@ if not overview_df.empty:
                 label="Current Value (Unrealized P/L)",
                 value=f"${current_value:,.2f}",
                 delta=delta_display,
-                delta_color="inverse"  # red for negative
+                delta_color="normal"  # red for negative, green for positive
             )
-        else:
-            delta_display = f" ${unrealized_pl:,.2f}"
+        elif unrealized_pl > 0:
+            delta_display = f"🟢 ${unrealized_pl:,.2f}"
             col4.metric(
                 label="Current Value (Unrealized P/L)",
                 value=f"${current_value:,.2f}",
                 delta=delta_display,
                 delta_color="normal"  # green for positive
+            )
+        else:
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta="$0.00",
+                delta_color="off"  # neutral gray
             )
 else:
     st.info("No holdings yet.")
