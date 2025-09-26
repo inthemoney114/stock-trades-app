@@ -13,6 +13,8 @@ st.markdown("### Your Stock Portfolio Dashboard")
 # --- Initialize Session State ---
 if "trades" not in st.session_state:
     st.session_state.trades = []
+if "live_prices" not in st.session_state:
+    st.session_state.live_prices = {}  # store user-entered live prices
 
 # --- LIFO Avg Cost & P/L Logic ---
 def update_trades_lifo(trades):
@@ -69,7 +71,11 @@ def portfolio_overview(holdings):
         if total_qty == 0:
             continue
         avg_cost = sum(q*p for q,p in lots) / total_qty
-        last_price = lots[-1][1] if lots else 0
+
+        # use user-entered live price if available
+        live_price = st.session_state.live_prices.get(symbol)
+        last_price = live_price if live_price else (lots[-1][1] if lots else 0)
+
         current_value = total_qty * last_price
         current_cost = total_qty * avg_cost
         overview_data.append({
@@ -83,7 +89,6 @@ def portfolio_overview(holdings):
 
 # --- Format Trades Table ---
 def style_trades(df):
-    # Separate TOTAL row
     df_main = df[df['Symbol'] != 'TOTAL'].copy()
     df_total = df[df['Symbol'] == 'TOTAL'].copy()
 
@@ -142,6 +147,19 @@ with col_delete.form("Delete Trade"):
         st.info("No trades to delete.")
         st.form_submit_button("Delete Trade")  # dummy submit button
 
+# --- Manual Live Price Input ---
+st.subheader("Update Live Prices")
+if st.session_state.trades:
+    with st.form("Live Prices"):
+        live_symbol = st.selectbox("Select Symbol", sorted(set(t["Symbol"] for t in st.session_state.trades)))
+        live_price = st.number_input("Enter Current Price", min_value=0.01, step=0.01, format="%.2f")
+        submitted_live = st.form_submit_button("Update Price")
+        if submitted_live:
+            st.session_state.live_prices[live_symbol] = live_price
+            st.success(f"Updated {live_symbol} live price to {live_price}")
+else:
+    st.info("Add a trade first to update live prices.")
+
 # --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 overview_df = portfolio_overview(holdings)
@@ -157,30 +175,14 @@ if not overview_df.empty:
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
 
-        # Format delta display
         if unrealized_pl < 0:
             delta_display = f"-${abs(unrealized_pl):,.2f}"
-            col4.metric(
-                label="Current Value (Unrealized P/L)",
-                value=f"${current_value:,.2f}",
-                delta=delta_display,
-                delta_color="normal"  # red for negative, green for positive
-            )
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
         elif unrealized_pl > 0:
             delta_display = f"🟢 ${unrealized_pl:,.2f}"
-            col4.metric(
-                label="Current Value (Unrealized P/L)",
-                value=f"${current_value:,.2f}",
-                delta=delta_display,
-                delta_color="normal"  # green for positive
-            )
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
         else:
-            col4.metric(
-                label="Current Value (Unrealized P/L)",
-                value=f"${current_value:,.2f}",
-                delta="$0.00",
-                delta_color="off"  # neutral gray
-            )
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", "$0.00", delta_color="off")
 else:
     st.info("No holdings yet.")
 
