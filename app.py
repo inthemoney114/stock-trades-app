@@ -128,65 +128,42 @@ def style_trades(df):
     return styled, df_total
 
 # --- Trade Management Panel ---
-st.markdown("""
-<style>
- .streamlit-expanderHeader {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #222;
-}
- .streamlit-expanderContent {
-    background: #f8f9fa;
-    border-radius: 0 0 8px 8px;
-    padding-top: 0.5rem;
-}
-.modern-metric .stMetric {
-    background: #f0f4f8;
-    border-radius: 8px;
-    padding: 0.5rem 0.5rem 0.5rem 1rem;
-    margin-bottom: 0.5rem;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.subheader("Trade Management")
+st.markdown("## 📝 Trade Management")
 col_add, col_delete = st.columns([2, 1])
 
-# --- Add Trade Form (Collapsible) ---
-with col_add:
-    with st.expander("➕ Add a Trade", expanded=True):
-        with st.form("Add Trade"):
-            symbol = st.text_input("Symbol").upper()
-            trade_type = st.selectbox("Type", ["Buy", "Sell"])
-            quantity = st.number_input("Quantity", min_value=1, step=1)
-            price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
-            date = st.date_input("Date", datetime.today())
-            submitted_add = st.form_submit_button("Add Trade")
-            if submitted_add:
-                st.session_state.trades.append({
-                    "Symbol": symbol,
-                    "Type": trade_type,
-                    "Quantity": quantity,
-                    "Price": price,
-                    "Date": date
-                })
-                st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
+# --- Add Trade Form ---
+with col_add.form("Add Trade"):
+    st.markdown("### ➕ Add a Trade")
+    symbol = st.text_input("Symbol").upper()
+    trade_type = st.selectbox("Type", ["Buy", "Sell"])
+    quantity = st.number_input("Quantity", min_value=1, step=1)
+    price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
+    date = st.date_input("Date", datetime.today())
+    submitted_add = st.form_submit_button("Add Trade")
+    if submitted_add:
+        st.session_state.trades.append({
+            "Symbol": symbol,
+            "Type": trade_type,
+            "Quantity": quantity,
+            "Price": price,
+            "Date": date
+        })
+        st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# --- Delete Trade Form (Collapsible) ---
-with col_delete:
-    with st.expander("➖ Delete a Trade", expanded=False):
-        with st.form("Delete Trade"):
-            if st.session_state.trades:
-                delete_index = st.number_input(
-                    "Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1
-                )
-                submitted_delete = st.form_submit_button("Delete Trade")
-                if submitted_delete:
-                    removed = st.session_state.trades.pop(delete_index)
-                    st.warning(f"Deleted trade: {removed}")
-            else:
-                st.info("No trades to delete.")
-                st.form_submit_button("Delete Trade")  # dummy submit button
+# --- Delete Trade Form ---
+with col_delete.form("Delete Trade"):
+    st.markdown("### 🗑️ Delete a Trade")
+    if st.session_state.trades:
+        delete_index = st.number_input(
+            "Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1
+        )
+        submitted_delete = st.form_submit_button("Delete Trade")
+        if submitted_delete:
+            removed = st.session_state.trades.pop(delete_index)
+            st.warning(f"Deleted trade: {removed}")
+    else:
+        st.info("No trades to delete.")
+        st.form_submit_button("Delete Trade")  # dummy submit
 
 # --- Manual Live Price Input ---
 st.subheader("Update Live Prices")
@@ -205,8 +182,22 @@ else:
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 overview_df = portfolio_overview(holdings)
 
-# --- Portfolio Dashboard Cards & Modern Graphs ---
-st.subheader("Portfolio Overview")
+# --- Summary Cards ---
+st.markdown("## 📦 Portfolio Summary")
+if not overview_df.empty:
+    total_value = overview_df["Current Value"].sum()
+    total_cost = overview_df["Current Cost"].sum()
+    total_pl = total_value - total_cost
+    col1, col2, col3 = st.columns(3)
+    col1.metric("💰 Total Cost", f"${total_cost:,.2f}")
+    col2.metric("📈 Current Value", f"${total_value:,.2f}")
+    if total_pl >= 0:
+        col3.metric("✅ Unrealized P/L", f"${total_pl:,.2f}", f"🟢 +${total_pl:,.2f}")
+    else:
+        col3.metric("❌ Unrealized P/L", f"${total_pl:,.2f}", f"-${abs(total_pl):,.2f}", delta_color="normal")
+
+# --- Portfolio Dashboard Cards per Symbol ---
+st.markdown("## 📊 Portfolio Overview by Symbol")
 if not overview_df.empty:
     for idx, row in overview_df.iterrows():
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -216,12 +207,11 @@ if not overview_df.empty:
         col4.metric(label="Live Price", value=f"${row['Live Price']:,.2f}")
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
+
         if unrealized_pl < 0:
-            delta_display = f"-${abs(unrealized_pl):,.2f}"
-            col5.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", f"-${abs(unrealized_pl):,.2f}", delta_color="normal")
         elif unrealized_pl > 0:
-            delta_display = f"🟢 ${unrealized_pl:,.2f}"
-            col5.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
+            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", f"🟢 ${unrealized_pl:,.2f}", delta_color="normal")
         else:
             col5.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", "$0.00", delta_color="off")
 
