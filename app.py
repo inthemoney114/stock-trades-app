@@ -99,9 +99,9 @@ def style_trades(df):
 
 # --- Trade Management Panel ---
 st.subheader("Trade Management")
-col_add, col_delete = st.columns([2, 1])  # wider column for Add Trade
+col_add, col_delete = st.columns([2, 1])  # wide add column
 
-# Add Trade Form
+# --- Add Trade Form ---
 with col_add.form("Add Trade"):
     st.markdown("### Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -109,7 +109,7 @@ with col_add.form("Add Trade"):
     quantity = st.number_input("Quantity", min_value=1, step=1)
     price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
     date = st.date_input("Date", datetime.today())
-    submitted_add = st.form_submit_button("Add Trade")
+    submitted_add = st.form_submit_button("Add Trade")  # ✅ submit button
     if submitted_add:
         st.session_state.trades.append({
             "Symbol": symbol,
@@ -120,17 +120,21 @@ with col_add.form("Add Trade"):
         })
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# Delete Trade Form
+# --- Delete Trade Form ---
 with col_delete.form("Delete Trade"):
     st.markdown("### Delete a Trade")
     if st.session_state.trades:
-        delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
-        submitted_delete = st.form_submit_button("Delete Trade")
+        delete_index = st.number_input(
+            "Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1
+        )
+        submitted_delete = st.form_submit_button("Delete Trade")  # ✅ submit button
         if submitted_delete:
             removed = st.session_state.trades.pop(delete_index)
             st.warning(f"Deleted trade: {removed}")
     else:
         st.info("No trades to delete.")
+        # Need a dummy submit button even if no trades
+        st.form_submit_button("Delete Trade")  # prevents missing submit button warning
 
 # --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
@@ -147,7 +151,6 @@ if not overview_df.empty:
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
         delta_display = f"${unrealized_pl:,.2f}"
-        # Add color emoji for visual cue
         if unrealized_pl < 0:
             delta_display = f"🔴 {delta_display}"
         elif unrealized_pl > 0:
