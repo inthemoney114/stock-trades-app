@@ -2,13 +2,19 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="Stock Tracker", layout="wide")
+# --- Page Config ---
+st.set_page_config(page_title="Stock Tracker Dashboard", layout="wide")
 
-# Initialize session state
+# --- User Info ---
+user_name = "Ali"  # You can make this dynamic later
+st.title(f"Welcome back, {user_name}!")
+st.markdown("### Your Stock Portfolio Dashboard")
+
+# --- Initialize Session State ---
 if "trades" not in st.session_state:
     st.session_state.trades = []
 
-# LIFO average cost & P/L calculation
+# --- LIFO Avg Cost & P/L Logic ---
 def update_trades_lifo(trades):
     data = []
     holdings = {}  # symbol -> list of [qty, price] for LIFO
@@ -55,7 +61,7 @@ def update_trades_lifo(trades):
         df.loc['Total'] = totals
     return df, holdings
 
-# Portfolio overview
+# --- Portfolio Overview ---
 def portfolio_overview(holdings):
     overview_data = []
     for symbol, lots in holdings.items():
@@ -63,7 +69,6 @@ def portfolio_overview(holdings):
         if total_qty == 0:
             continue
         avg_cost = sum(q*p for q,p in lots) / total_qty
-        # For current value, use last trade price as placeholder
         last_price = lots[-1][1] if lots else 0
         current_value = total_qty * last_price
         current_cost = total_qty * avg_cost
@@ -76,7 +81,7 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
-# Add new trade
+# --- Add New Trade ---
 with st.form("Add Trade"):
     st.subheader("Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -95,7 +100,7 @@ with st.form("Add Trade"):
         })
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# Delete trade
+# --- Delete Trade ---
 st.subheader("Delete a Trade")
 if st.session_state.trades:
     delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
@@ -105,10 +110,10 @@ if st.session_state.trades:
 else:
     st.info("No trades to delete.")
 
-# Update trades
+# --- Update Trades ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 
-# Portfolio overview display
+# --- Display Portfolio Overview at Top ---
 st.subheader("Portfolio Overview")
 overview_df = portfolio_overview(holdings)
 if not overview_df.empty:
@@ -116,11 +121,11 @@ if not overview_df.empty:
 else:
     st.info("No holdings yet.")
 
-# Show trades
+# --- Display Trades Table ---
 st.subheader("Trades Table")
 st.dataframe(trades_df, use_container_width=True, height=400)
 
-# Download CSV
+# --- Download CSV ---
 if not trades_df.empty:
     csv = trades_df.to_csv(index=False).encode('utf-8')
     st.download_button("Download CSV", csv, "trades.csv", "text/csv")
