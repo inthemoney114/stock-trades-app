@@ -10,7 +10,7 @@ if "trades" not in st.session_state:
     ])
 
 st.title("📈 Stock Portfolio Tracker")
-st.markdown("Add, track, and manage your trades with FIFO average cost calculation.")
+st.markdown("Add, track, and manage your trades with LIFO average cost calculation.")
 
 # ---- Add a Trade ----
 st.header("Add a Trade")
@@ -35,12 +35,15 @@ with st.form("trade_form"):
         st.session_state.trades = pd.concat([st.session_state.trades, new_trade], ignore_index=True)
         st.success(f"{action} trade added: {qty} shares of {stock} at ${price} with ${brokerage} brokerage")
 
-# ---- Process FIFO sells ----
+# ---- Process LIFO sells ----
 trades_df = st.session_state.trades.copy()
 for stock in trades_df["Stock"].unique():
     buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
     sells = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Sell")].copy()
     
+    # Reverse buys for LIFO
+    buys = buys.iloc[::-1]
+
     for _, sell in sells.iterrows():
         qty_to_sell = sell["Quantity"]
         for bidx, buy in buys.iterrows():
@@ -51,6 +54,7 @@ for stock in trades_df["Stock"].unique():
             else:
                 qty_to_sell -= buys.at[bidx, "Remaining"]
                 buys.at[bidx, "Remaining"] = 0
+    # Write remaining back to original trades_df
     trades_df.loc[buys.index, "Remaining"] = buys["Remaining"]
 
 # ---- Calculate Progressive Average Cost ----
@@ -109,19 +113,4 @@ if not trades_df.empty:
     total_cols[3].write("")  # Price
     total_cols[4].write("")  # Brokerage
     total_cols[5].markdown(f"**{total_qty}**")
-    total_cols[6].markdown(f"**${total_invested:.2f}**")
-    total_cols[7].write("")  # Delete button empty
-else:
-    st.write("No trades yet.")
-
-# ---- Portfolio Metrics ----
-st.header("Portfolio Metrics")
-remaining_buys = trades_df[(trades_df["Action"]=="Buy") & (trades_df["Remaining"]>0)]
-if not remaining_buys.empty:
-    total_qty = remaining_buys["Remaining"].sum()
-    total_invested = (remaining_buys["Remaining"] * (remaining_buys["Price"] + remaining_buys["Brokerage"]/remaining_buys["Quantity"])).sum()
-else:
-    total_qty = total_invested = 0
-
-st.metric("Total Shares Remaining", f"{total_qty}")
-st.metric("Total Invested ($)", f"${total_invested:,.2f}")
+    total_cols[6]._
