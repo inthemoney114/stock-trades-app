@@ -81,24 +81,6 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
-# --- Update Trades & Portfolio AFTER any changes ---
-trades_df, holdings = update_trades_lifo(st.session_state.trades)
-overview_df = portfolio_overview(holdings)
-
-# --- Portfolio Dashboard Cards ---
-st.subheader("Portfolio Overview")
-if not overview_df.empty:
-    for idx, row in overview_df.iterrows():
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric(label=f"{row['Symbol']} Quantity", value=row['Quantity'])
-        col2.metric(label="Avg Cost", value=f"${row['Avg Cost']:.2f}")
-        col3.metric(label="Current Cost", value=f"${row['Current Cost']:.2f}")
-        current_value = row['Current Value']
-        unrealized_pl = current_value - row['Current Cost']
-        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:.2f}", delta=f"${unrealized_pl:.2f}")
-else:
-    st.info("No holdings yet.")
-
 # --- Trade Management Panel ---
 st.subheader("Trade Management")
 col_add, col_delete = st.columns([2, 1])  # wider column for Add Trade
@@ -133,6 +115,24 @@ with col_delete.form("Delete Trade"):
             st.warning(f"Deleted trade: {removed}")
     else:
         st.info("No trades to delete.")
+
+# --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
+trades_df, holdings = update_trades_lifo(st.session_state.trades)
+overview_df = portfolio_overview(holdings)
+
+# --- Portfolio Dashboard Cards ---
+st.subheader("Portfolio Overview")
+if not overview_df.empty:
+    for idx, row in overview_df.iterrows():
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(label=f"{row['Symbol']} Quantity", value=row['Quantity'])
+        col2.metric(label="Avg Cost", value=f"${row['Avg Cost']:.2f}")
+        col3.metric(label="Current Cost", value=f"${row['Current Cost']:.2f}")
+        current_value = row['Current Value']
+        unrealized_pl = current_value - row['Current Cost']
+        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:.2f}", delta=f"${unrealized_pl:.2f}")
+else:
+    st.info("No holdings yet.")
 
 # --- Trades Table ---
 st.subheader("Trades Table")
