@@ -8,37 +8,54 @@ st.set_page_config(page_title="Stock Tracker", layout="wide")
 if "trades" not in st.session_state:
     st.session_state.trades = []
 
-# Helper functions
-def calculate_lifo_avg_cost(trades, symbol):
+# LIFO average cost & P/L calculation
+def update_trades_lifo(trades):
     """
-    Calculate average cost for a given symbol using LIFO method.
-    Returns current average cost.
+    Returns a dataframe with proper Avg Cost (LIFO) and P/L for sells.
     """
-    relevant_trades = [t for t in trades if t['Symbol'] == symbol]
-    position = 0
-    total_cost = 0
-    for trade in reversed(relevant_trades):
-        if trade['Type'] == "Buy":
-            qty_to_add = min(trade['Quantity'], position) if position > 0 else trade['Quantity']
-            total_cost += qty_to_add * trade['Price']
-            position += trade['Quantity']
-        elif trade['Type'] == "Sell":
-            position -= trade['Quantity']
-    return round(total_cost / position, 2) if position != 0 else 0
+    data = []
+    holdings = {}  # symbol -> list of [qty, price] for LIFO
+    for t in trades:
+        symbol = t['Symbol']
+        qty = t['Quantity']
+        price = t['Price']
+        trade_type = t['Type']
 
-def update_trades():
-    df = pd.DataFrame(st.session_state.trades)
+        if symbol not in holdings:
+            holdings[symbol] = []
+
+        if trade_type == "Buy":
+            holdings[symbol].append([qty, price])
+            total_qty = sum(q for q, p in holdings[symbol])
+            avg_cost = sum(q*p for q,p in holdings[symbol]) / total_qty
+            data.append({**t, "Avg Cost": round(avg_cost, 3), "P/L": 0})
+        else:  # Sell
+            sell_qty = qty
+            pl = 0
+            while sell_qty > 0 and holdings[symbol]:
+                lot_qty, lot_price = holdings[symbol].pop()
+                taken = min(lot_qty, sell_qty)
+                pl += taken * (price - lot_price)
+                lot_qty -= taken
+                sell_qty -= taken
+                if lot_qty > 0:
+                    holdings[symbol].append([lot_qty, lot_price])
+            if holdings[symbol]:
+                total_qty = sum(q for q,p in holdings[symbol])
+                avg_cost = sum(q*p for q,p in holdings[symbol]) / total_qty
+            else:
+                avg_cost = 0
+            data.append({**t, "Avg Cost": round(avg_cost, 3), "P/L": round(pl, 2)})
+    
+    df = pd.DataFrame(data)
     if not df.empty:
         df['Total'] = df['Quantity'] * df['Price']
-        df['Avg Cost'] = df.apply(lambda x: calculate_lifo_avg_cost(st.session_state.trades, x['Symbol']), axis=1)
-        df['P/L'] = df.apply(lambda x: (x['Price'] - x['Avg Cost']) * x['Quantity'] if x['Type']=="Sell" else 0, axis=1)
-        df.loc['Total'] = df[['Quantity', 'Total', 'P/L']].sum()
-        df.at['Total', 'Symbol'] = "TOTAL"
-        df.at['Total', 'Type'] = "-"
-        df.at['Total', 'Price'] = "-"
-        df.at['Total', 'Avg Cost'] = "-"
-    else:
-        df = pd.DataFrame()
+        totals = df[['Quantity', 'Total', 'P/L']].sum()
+        totals['Symbol'] = 'TOTAL'
+        totals['Type'] = '-'
+        totals['Price'] = '-'
+        totals['Avg Cost'] = '-'
+        df.loc['Total'] = totals
     return df
 
 # Add new trade
@@ -72,10 +89,10 @@ else:
 
 # Show trades
 st.subheader("Trades Table")
-trades_df = update_trades()
+trades_df = update_trades_lifo(st.session_state.trades)
 st.dataframe(trades_df, use_container_width=True, height=400)
 
-# Download option
+# Download CSV
 if not trades_df.empty:
     csv = trades_df.to_csv(index=False).encode('utf-8')
     st.download_button("Download CSV", csv, "trades.csv", "text/csv")
