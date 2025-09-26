@@ -69,7 +69,7 @@ for stock in trades_df["Stock"].unique():
         else:
             trades_df.at[idx, "Progressive Avg Cost"] = 0.0
 
-# ---- Display table with delete buttons ----
+# ---- Display table with delete buttons and total row ----
 st.header("Portfolio Trades")
 
 if not trades_df.empty:
@@ -94,6 +94,23 @@ if not trades_df.empty:
             st.session_state.trades.drop(index=idx, inplace=True)
             st.session_state.trades.reset_index(drop=True, inplace=True)
             st.experimental_rerun()
+    
+    # ---- Add total row ----
+    total_qty = trades_df[trades_df["Action"]=="Buy"]["Remaining"].sum()
+    total_invested = (trades_df[trades_df["Action"]=="Buy"]["Remaining"] * 
+                      (trades_df[trades_df["Action"]=="Buy"]["Price"] + 
+                       trades_df[trades_df["Action"]=="Buy"]["Brokerage"]/trades_df[trades_df["Action"]=="Buy"]["Quantity"])
+                     ).sum()
+    
+    total_cols = st.columns(col_widths)
+    total_cols[0].markdown("**TOTAL**")
+    total_cols[1].write("")  # Action
+    total_cols[2].write("")  # Quantity
+    total_cols[3].write("")  # Price
+    total_cols[4].write("")  # Brokerage
+    total_cols[5].markdown(f"**{total_qty}**")
+    total_cols[6].markdown(f"**${total_invested:.2f}**")
+    total_cols[7].write("")  # Delete button empty
 else:
     st.write("No trades yet.")
 
