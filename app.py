@@ -81,8 +81,10 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
-# --- Add New Trade Form ---
-st.sidebar.header("Add / Delete Trades")
+# --- Sidebar: Add / Delete Trades ---
+st.sidebar.header("Trade Management")
+
+# Add Trade
 with st.sidebar.form("Add Trade"):
     st.subheader("Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -101,7 +103,7 @@ with st.sidebar.form("Add Trade"):
         })
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# --- Delete Trade ---
+# Delete Trade
 if st.session_state.trades:
     with st.sidebar.form("Delete Trade"):
         st.subheader("Delete a Trade")
@@ -111,14 +113,21 @@ if st.session_state.trades:
             removed = st.session_state.trades.pop(delete_index)
             st.warning(f"Deleted trade: {removed}")
 
-# --- Update Trades & Portfolio AFTER any changes ---
+# --- Update Trades & Portfolio AFTER changes ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 overview_df = portfolio_overview(holdings)
 
-# --- Portfolio Overview at Top ---
+# --- Portfolio Dashboard Cards ---
 st.subheader("Portfolio Overview")
 if not overview_df.empty:
-    st.dataframe(overview_df, use_container_width=True)
+    for idx, row in overview_df.iterrows():
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(label=f"{row['Symbol']} Quantity", value=row['Quantity'])
+        col2.metric(label="Avg Cost", value=f"${row['Avg Cost']:.2f}")
+        col3.metric(label="Current Cost", value=f"${row['Current Cost']:.2f}")
+        current_value = row['Current Value']
+        unrealized_pl = current_value - row['Current Cost']
+        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:.2f}", delta=f"${unrealized_pl:.2f}")
 else:
     st.info("No holdings yet.")
 
