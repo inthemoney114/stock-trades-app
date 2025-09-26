@@ -123,4 +123,9 @@ else:
 
 # --- Display Trades Table ---
 st.subheader("Trades Table")
-st.dataframe(trades_df, us_
+st.dataframe(trades_df, use_container_width=True, height=400)
+
+# --- Download CSV ---
+if not trades_df.empty:
+    csv = trades_df.to_csv(index=False).encode('utf-8')
+    st.download_button("Download CSV", csv, "trades.csv", "text/csv")
