@@ -81,39 +81,7 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
-# --- Sidebar: Add / Delete Trades ---
-st.sidebar.header("Trade Management")
-
-# Add Trade
-with st.sidebar.form("Add Trade"):
-    st.subheader("Add a Trade")
-    symbol = st.text_input("Symbol").upper()
-    trade_type = st.selectbox("Type", ["Buy", "Sell"])
-    quantity = st.number_input("Quantity", min_value=1, step=1)
-    price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
-    date = st.date_input("Date", datetime.today())
-    submitted = st.form_submit_button("Add Trade")
-    if submitted:
-        st.session_state.trades.append({
-            "Symbol": symbol,
-            "Type": trade_type,
-            "Quantity": quantity,
-            "Price": price,
-            "Date": date
-        })
-        st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
-
-# Delete Trade
-if st.session_state.trades:
-    with st.sidebar.form("Delete Trade"):
-        st.subheader("Delete a Trade")
-        delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
-        delete_submitted = st.form_submit_button("Delete Trade")
-        if delete_submitted:
-            removed = st.session_state.trades.pop(delete_index)
-            st.warning(f"Deleted trade: {removed}")
-
-# --- Update Trades & Portfolio AFTER changes ---
+# --- Update Trades & Portfolio AFTER any changes ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
 overview_df = portfolio_overview(holdings)
 
@@ -130,6 +98,41 @@ if not overview_df.empty:
         col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:.2f}", delta=f"${unrealized_pl:.2f}")
 else:
     st.info("No holdings yet.")
+
+# --- Trade Management Panel ---
+st.subheader("Trade Management")
+col_add, col_delete = st.columns([2, 1])  # wider column for Add Trade
+
+# Add Trade Form
+with col_add.form("Add Trade"):
+    st.markdown("### Add a Trade")
+    symbol = st.text_input("Symbol").upper()
+    trade_type = st.selectbox("Type", ["Buy", "Sell"])
+    quantity = st.number_input("Quantity", min_value=1, step=1)
+    price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
+    date = st.date_input("Date", datetime.today())
+    submitted = st.form_submit_button("Add Trade")
+    if submitted:
+        st.session_state.trades.append({
+            "Symbol": symbol,
+            "Type": trade_type,
+            "Quantity": quantity,
+            "Price": price,
+            "Date": date
+        })
+        st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
+
+# Delete Trade Form
+with col_delete.form("Delete Trade"):
+    st.markdown("### Delete a Trade")
+    if st.session_state.trades:
+        delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
+        delete_submitted = st.form_submit_button("Delete Trade")
+        if delete_submitted:
+            removed = st.session_state.trades.pop(delete_index)
+            st.warning(f"Deleted trade: {removed}")
+    else:
+        st.info("No trades to delete.")
 
 # --- Trades Table ---
 st.subheader("Trades Table")
