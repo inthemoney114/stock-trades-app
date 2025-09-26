@@ -156,12 +156,24 @@ if not overview_df.empty:
         col3.metric(label="Current Cost", value=f"${row['Current Cost']:,.2f}")
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
-        delta_display = f"${unrealized_pl:,.2f}"
+
+        # Format delta display
         if unrealized_pl < 0:
-            delta_display = f"🔴 {delta_display}"
-        elif unrealized_pl > 0:
-            delta_display = f"🟢 {delta_display}"
-        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:,.2f}", delta=delta_display)
+            delta_display = f"-${abs(unrealized_pl):,.2f}"
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta=delta_display,
+                delta_color="inverse"  # red for negative
+            )
+        else:
+            delta_display = f" ${unrealized_pl:,.2f}"
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta=delta_display,
+                delta_color="normal"  # green for positive
+            )
 else:
     st.info("No holdings yet.")
 
