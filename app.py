@@ -6,7 +6,7 @@ from datetime import datetime
 st.set_page_config(page_title="Stock Tracker Dashboard", layout="wide")
 
 # --- User Info ---
-user_name = "Ali"  # You can make this dynamic later
+user_name = "Ali"
 st.title(f"Welcome back, {user_name}!")
 st.markdown("### Your Stock Portfolio Dashboard")
 
@@ -31,7 +31,7 @@ def update_trades_lifo(trades):
             holdings[symbol].append([qty, price])
             total_qty = sum(q for q, p in holdings[symbol])
             avg_cost = sum(q*p for q,p in holdings[symbol]) / total_qty
-            data.append({**t, "Avg Cost": round(avg_cost, 3), "P/L": 0})
+            data.append({**t, "Avg Cost": round(avg_cost, 2), "P/L": 0})
         else:  # Sell
             sell_qty = qty
             pl = 0
@@ -48,7 +48,7 @@ def update_trades_lifo(trades):
                 avg_cost = sum(q*p for q,p in holdings[symbol]) / total_qty
             else:
                 avg_cost = 0
-            data.append({**t, "Avg Cost": round(avg_cost, 3), "P/L": round(pl, 2)})
+            data.append({**t, "Avg Cost": round(avg_cost, 2), "P/L": round(pl, 2)})
     
     df = pd.DataFrame(data)
     if not df.empty:
@@ -75,25 +75,15 @@ def portfolio_overview(holdings):
         overview_data.append({
             "Symbol": symbol,
             "Quantity": total_qty,
-            "Avg Cost": round(avg_cost,3),
+            "Avg Cost": round(avg_cost,2),
             "Current Cost": round(current_cost,2),
             "Current Value": round(current_value,2)
         })
     return pd.DataFrame(overview_data)
 
-# --- Update Trades ---
-trades_df, holdings = update_trades_lifo(st.session_state.trades)
-
-# --- Display Portfolio Overview at Top ---
-st.subheader("Portfolio Overview")
-overview_df = portfolio_overview(holdings)
-if not overview_df.empty:
-    st.dataframe(overview_df, use_container_width=True)
-else:
-    st.info("No holdings yet.")
-
 # --- Add New Trade Form ---
-with st.form("Add Trade"):
+st.sidebar.header("Add / Delete Trades")
+with st.sidebar.form("Add Trade"):
     st.subheader("Add a Trade")
     symbol = st.text_input("Symbol").upper()
     trade_type = st.selectbox("Type", ["Buy", "Sell"])
@@ -112,16 +102,27 @@ with st.form("Add Trade"):
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
 # --- Delete Trade ---
-st.subheader("Delete a Trade")
 if st.session_state.trades:
-    delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
-    if st.button("Delete Trade"):
-        removed = st.session_state.trades.pop(delete_index)
-        st.warning(f"Deleted trade: {removed}")
-else:
-    st.info("No trades to delete.")
+    with st.sidebar.form("Delete Trade"):
+        st.subheader("Delete a Trade")
+        delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
+        delete_submitted = st.form_submit_button("Delete Trade")
+        if delete_submitted:
+            removed = st.session_state.trades.pop(delete_index)
+            st.warning(f"Deleted trade: {removed}")
 
-# --- Display Trades Table ---
+# --- Update Trades & Portfolio AFTER any changes ---
+trades_df, holdings = update_trades_lifo(st.session_state.trades)
+overview_df = portfolio_overview(holdings)
+
+# --- Portfolio Overview at Top ---
+st.subheader("Portfolio Overview")
+if not overview_df.empty:
+    st.dataframe(overview_df, use_container_width=True)
+else:
+    st.info("No holdings yet.")
+
+# --- Trades Table ---
 st.subheader("Trades Table")
 st.dataframe(trades_df, use_container_width=True, height=400)
 
