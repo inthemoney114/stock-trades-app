@@ -17,7 +17,7 @@ if "trades" not in st.session_state:
 # --- LIFO Avg Cost & P/L Logic ---
 def update_trades_lifo(trades):
     data = []
-    holdings = {}  # symbol -> list of [qty, price] for LIFO
+    holdings = {}
     for t in trades:
         symbol = t['Symbol']
         qty = t['Quantity']
@@ -49,7 +49,7 @@ def update_trades_lifo(trades):
             else:
                 avg_cost = 0
             data.append({**t, "Avg Cost": round(avg_cost, 2), "P/L": round(pl, 2)})
-    
+
     df = pd.DataFrame(data)
     if not df.empty:
         df['Total'] = df['Quantity'] * df['Price']
@@ -85,7 +85,7 @@ def portfolio_overview(holdings):
 st.subheader("Trade Management")
 col_add, col_delete = st.columns([2, 1])  # wider column for Add Trade
 
-# Add Trade Form
+# --- Add Trade Form ---
 with col_add.form("Add Trade"):
     st.markdown("### Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -93,8 +93,8 @@ with col_add.form("Add Trade"):
     quantity = st.number_input("Quantity", min_value=1, step=1)
     price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
     date = st.date_input("Date", datetime.today())
-    submitted = st.form_submit_button("Add Trade")
-    if submitted:
+    submitted_add = st.form_submit_button("Add Trade")
+    if submitted_add:
         st.session_state.trades.append({
             "Symbol": symbol,
             "Type": trade_type,
@@ -104,13 +104,13 @@ with col_add.form("Add Trade"):
         })
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# Delete Trade Form
+# --- Delete Trade Form ---
 with col_delete.form("Delete Trade"):
     st.markdown("### Delete a Trade")
     if st.session_state.trades:
         delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
-        delete_submitted = st.form_submit_button("Delete Trade")
-        if delete_submitted:
+        submitted_delete = st.form_submit_button("Delete Trade")
+        if submitted_delete:
             removed = st.session_state.trades.pop(delete_index)
             st.warning(f"Deleted trade: {removed}")
     else:
