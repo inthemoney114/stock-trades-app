@@ -10,9 +10,6 @@ if "trades" not in st.session_state:
 
 # LIFO average cost & P/L calculation
 def update_trades_lifo(trades):
-    """
-    Returns a dataframe with proper Avg Cost (LIFO) and P/L for sells.
-    """
     data = []
     holdings = {}  # symbol -> list of [qty, price] for LIFO
     for t in trades:
@@ -56,7 +53,28 @@ def update_trades_lifo(trades):
         totals['Price'] = '-'
         totals['Avg Cost'] = '-'
         df.loc['Total'] = totals
-    return df
+    return df, holdings
+
+# Portfolio overview
+def portfolio_overview(holdings):
+    overview_data = []
+    for symbol, lots in holdings.items():
+        total_qty = sum(q for q,p in lots)
+        if total_qty == 0:
+            continue
+        avg_cost = sum(q*p for q,p in lots) / total_qty
+        # For current value, use last trade price as placeholder
+        last_price = lots[-1][1] if lots else 0
+        current_value = total_qty * last_price
+        current_cost = total_qty * avg_cost
+        overview_data.append({
+            "Symbol": symbol,
+            "Quantity": total_qty,
+            "Avg Cost": round(avg_cost,3),
+            "Current Cost": round(current_cost,2),
+            "Current Value": round(current_value,2)
+        })
+    return pd.DataFrame(overview_data)
 
 # Add new trade
 with st.form("Add Trade"):
@@ -87,9 +105,19 @@ if st.session_state.trades:
 else:
     st.info("No trades to delete.")
 
+# Update trades
+trades_df, holdings = update_trades_lifo(st.session_state.trades)
+
+# Portfolio overview display
+st.subheader("Portfolio Overview")
+overview_df = portfolio_overview(holdings)
+if not overview_df.empty:
+    st.dataframe(overview_df, use_container_width=True)
+else:
+    st.info("No holdings yet.")
+
 # Show trades
 st.subheader("Trades Table")
-trades_df = update_trades_lifo(st.session_state.trades)
 st.dataframe(trades_df, use_container_width=True, height=400)
 
 # Download CSV
