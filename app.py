@@ -18,29 +18,19 @@ with st.form("trade_form"):
     submitted = st.form_submit_button("Submit Trade")
     if submitted:
         st.success(f"{action} trade added: {qty} shares of {stock} at ${price}")
+        # Here you would add the trade to your session_state or database
 
 # ---- Portfolio section ----
 st.header("Portfolio Overview")
-# Example DataFrame (replace with your own data)
-data = {
-    "Stock": ["AAPL", "TSLA"],
-    "Quantity": [50, 10],
-    "Avg Cost": [170.0, 650.0],
-    "Current Price": [180.0, 700.0],
-    "P/L": [500, 500],
-}
-df = pd.DataFrame(data)
+# Empty placeholder DataFrame for now
+df = pd.DataFrame(columns=["Stock","Quantity","Avg Cost","Current Price","P/L"])
 st.table(df)
 
 # ---- Analytics ----
 st.header("Portfolio Analytics")
-total_invested = sum(df["Quantity"] * df["Avg Cost"])
-current_value = sum(df["Quantity"] * df["Current Price"])
-total_pl = current_value - total_invested
-
-st.metric("Total Invested", f"${total_invested:,.2f}")
-st.metric("Current Value", f"${current_value:,.2f}")
-st.metric("Total P/L", f"${total_pl:,.2f}")
+st.metric("Total Invested", "$0.00")
+st.metric("Current Value", "$0.00")
+st.metric("Total P/L", "$0.00")
 
 # ---- Notes / Info ----
 st.header("Notes / Info")
