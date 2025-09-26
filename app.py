@@ -83,6 +83,10 @@ def portfolio_overview(holdings):
 
 # --- Format Trades Table ---
 def style_trades(df):
+    # Separate TOTAL row to avoid styling errors
+    df_main = df[df['Symbol'] != 'TOTAL'].copy()
+    df_total = df[df['Symbol'] == 'TOTAL'].copy()
+
     def color_pl(val):
         if isinstance(val, (int, float)):
             if val < 0:
@@ -90,12 +94,19 @@ def style_trades(df):
             elif val > 0:
                 return 'color: green'
         return ''
-    return df.style.format({
+
+    styled = df_main.style.format({
         'Price': '${:,.2f}',
         'Avg Cost': '${:,.2f}',
         'Total': '${:,.2f}',
         'P/L': '${:,.2f}'
     }).applymap(color_pl, subset=['P/L'])
+
+    # Append TOTAL row back without styling
+    if not df_total.empty:
+        styled = styled.append(df_total)
+
+    return styled
 
 # --- Trade Management Panel ---
 st.subheader("Trade Management")
@@ -133,8 +144,7 @@ with col_delete.form("Delete Trade"):
             st.warning(f"Deleted trade: {removed}")
     else:
         st.info("No trades to delete.")
-        # Need a dummy submit button even if no trades
-        st.form_submit_button("Delete Trade")  # prevents missing submit button warning
+        st.form_submit_button("Delete Trade")  # dummy button to prevent missing submit warning
 
 # --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
