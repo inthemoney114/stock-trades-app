@@ -9,11 +9,10 @@ if "trades" not in st.session_state:
         "Stock", "Action", "Quantity", "Price", "Brokerage", "Remaining"
     ])
 
-# Title
 st.title("📈 Stock Portfolio Tracker")
-st.markdown("Manage your trades and see your portfolio at a glance.")
+st.markdown("Add, track, and manage your trades with FIFO average cost calculation.")
 
-# Add a trade
+# ---- Add a Trade ----
 st.header("Add a Trade")
 with st.form("trade_form"):
     stock = st.text_input("Stock Symbol")
@@ -36,16 +35,12 @@ with st.form("trade_form"):
         st.session_state.trades = pd.concat([st.session_state.trades, new_trade], ignore_index=True)
         st.success(f"{action} trade added: {qty} shares of {stock} at ${price} with ${brokerage} brokerage")
 
-# Portfolio Overview
-st.header("Portfolio Overview")
+# ---- Process FIFO sells ----
 trades_df = st.session_state.trades.copy()
-
-# Process sells using FIFO per stock
 for stock in trades_df["Stock"].unique():
     buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
     sells = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Sell")].copy()
     
-    # Reduce remaining per buy lot
     for _, sell in sells.iterrows():
         qty_to_sell = sell["Quantity"]
         for bidx, buy in buys.iterrows():
@@ -58,9 +53,8 @@ for stock in trades_df["Stock"].unique():
                 buys.at[bidx, "Remaining"] = 0
     trades_df.loc[buys.index, "Remaining"] = buys["Remaining"]
 
-# Calculate progressive average cost per row for each stock
+# ---- Calculate Progressive Average Cost ----
 trades_df["Progressive Avg Cost"] = 0.0
-
 for stock in trades_df["Stock"].unique():
     remaining_buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
     total_qty = 0
@@ -75,4 +69,29 @@ for stock in trades_df["Stock"].unique():
         else:
             trades_df.at[idx, "Progressive Avg Cost"] = 0.0
 
-st.table(trades_df)
+# ---- Display Trades with Delete Button ----
+st.header("Portfolio Trades")
+if not trades_df.empty:
+    for idx, row in trades_df.iterrows():
+        col1, col2 = st.columns([6,1])
+        with col1:
+            st.write(f"{row['Stock']} | {row['Action']} | Qty: {row['Quantity']} | Price: ${row['Price']} | Brokerage: ${row['Brokerage']} | Remaining: {row['Remaining']} | Avg Cost: ${row['Progressive Avg Cost']:.2f}")
+        with col2:
+            if st.button("Delete", key=f"del_{idx}"):
+                st.session_state.trades.drop(index=idx, inplace=True)
+                st.session_state.trades.reset_index(drop=True, inplace=True)
+                st.experimental_rerun()
+else:
+    st.write("No trades yet.")
+
+# ---- Portfolio Metrics ----
+st.header("Portfolio Metrics")
+remaining_buys = trades_df[(trades_df["Action"]=="Buy") & (trades_df["Remaining"]>0)]
+if not remaining_buys.empty:
+    total_qty = remaining_buys["Remaining"].sum()
+    total_invested = (remaining_buys["Remaining"] * (remaining_buys["Price"] + remaining_buys["Brokerage"]/remaining_buys["Quantity"])).sum()
+else:
+    total_qty = total_invested = 0
+
+st.metric("Total Shares Remaining", f"{total_qty}")
+st.metric("Total Invested ($)", f"${total_invested:,.2f}")
