@@ -69,18 +69,31 @@ for stock in trades_df["Stock"].unique():
         else:
             trades_df.at[idx, "Progressive Avg Cost"] = 0.0
 
-# ---- Display Trades with Delete Button ----
+# ---- Display table with delete buttons ----
 st.header("Portfolio Trades")
+
 if not trades_df.empty:
+    # Header row
+    headers = ["Stock","Action","Quantity","Price","Brokerage","Remaining","Avg Cost","Delete"]
+    col_widths = [1.5,1,1,1,1,1,1,0.5]
+    cols = st.columns(col_widths)
+    for col, header in zip(cols, headers):
+        col.markdown(f"**{header}**")
+    
+    # Trade rows
     for idx, row in trades_df.iterrows():
-        col1, col2 = st.columns([6,1])
-        with col1:
-            st.write(f"{row['Stock']} | {row['Action']} | Qty: {row['Quantity']} | Price: ${row['Price']} | Brokerage: ${row['Brokerage']} | Remaining: {row['Remaining']} | Avg Cost: ${row['Progressive Avg Cost']:.2f}")
-        with col2:
-            if st.button("Delete", key=f"del_{idx}"):
-                st.session_state.trades.drop(index=idx, inplace=True)
-                st.session_state.trades.reset_index(drop=True, inplace=True)
-                st.experimental_rerun()
+        cols = st.columns(col_widths)
+        cols[0].write(row['Stock'])
+        cols[1].write(row['Action'])
+        cols[2].write(row['Quantity'])
+        cols[3].write(f"${row['Price']:.2f}")
+        cols[4].write(f"${row['Brokerage']:.2f}")
+        cols[5].write(row['Remaining'])
+        cols[6].write(f"${row['Progressive Avg Cost']:.2f}")
+        if cols[7].button("Delete", key=f"del_{idx}"):
+            st.session_state.trades.drop(index=idx, inplace=True)
+            st.session_state.trades.reset_index(drop=True, inplace=True)
+            st.experimental_rerun()
 else:
     st.write("No trades yet.")
 
