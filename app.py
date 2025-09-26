@@ -83,7 +83,7 @@ def portfolio_overview(holdings):
 
 # --- Format Trades Table ---
 def style_trades(df):
-    # Separate TOTAL row to avoid styling errors
+    # Separate TOTAL row
     df_main = df[df['Symbol'] != 'TOTAL'].copy()
     df_total = df[df['Symbol'] == 'TOTAL'].copy()
 
@@ -102,11 +102,7 @@ def style_trades(df):
         'P/L': '${:,.2f}'
     }).applymap(color_pl, subset=['P/L'])
 
-    # Append TOTAL row back without styling
-    if not df_total.empty:
-        styled = styled.append(df_total)
-
-    return styled
+    return styled, df_total
 
 # --- Trade Management Panel ---
 st.subheader("Trade Management")
@@ -120,7 +116,7 @@ with col_add.form("Add Trade"):
     quantity = st.number_input("Quantity", min_value=1, step=1)
     price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
     date = st.date_input("Date", datetime.today())
-    submitted_add = st.form_submit_button("Add Trade")  # ✅ submit button
+    submitted_add = st.form_submit_button("Add Trade")
     if submitted_add:
         st.session_state.trades.append({
             "Symbol": symbol,
@@ -138,13 +134,13 @@ with col_delete.form("Delete Trade"):
         delete_index = st.number_input(
             "Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1
         )
-        submitted_delete = st.form_submit_button("Delete Trade")  # ✅ submit button
+        submitted_delete = st.form_submit_button("Delete Trade")
         if submitted_delete:
             removed = st.session_state.trades.pop(delete_index)
             st.warning(f"Deleted trade: {removed}")
     else:
         st.info("No trades to delete.")
-        st.form_submit_button("Delete Trade")  # dummy button to prevent missing submit warning
+        st.form_submit_button("Delete Trade")  # dummy submit button
 
 # --- UPDATE TRADES & PORTFOLIO AFTER ADD/DELETE ---
 trades_df, holdings = update_trades_lifo(st.session_state.trades)
@@ -172,7 +168,11 @@ else:
 # --- Trades Table ---
 st.subheader("Trades Table")
 if not trades_df.empty:
-    st.dataframe(style_trades(trades_df), use_container_width=True, height=400)
+    styled_df, total_row = style_trades(trades_df)
+    st.dataframe(styled_df, use_container_width=True, height=400)
+    if not total_row.empty:
+        st.markdown("**TOTAL**")
+        st.dataframe(total_row, use_container_width=True)
 else:
     st.info("No trades yet.")
 
