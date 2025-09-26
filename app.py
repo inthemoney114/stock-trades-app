@@ -81,11 +81,27 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
+# --- Format Trades Table ---
+def style_trades(df):
+    def color_pl(val):
+        if isinstance(val, (int, float)):
+            if val < 0:
+                return 'color: red'
+            elif val > 0:
+                return 'color: green'
+        return ''
+    return df.style.format({
+        'Price': '${:,.2f}',
+        'Avg Cost': '${:,.2f}',
+        'Total': '${:,.2f}',
+        'P/L': '${:,.2f}'
+    }).applymap(color_pl, subset=['P/L'])
+
 # --- Trade Management Panel ---
 st.subheader("Trade Management")
 col_add, col_delete = st.columns([2, 1])  # wider column for Add Trade
 
-# --- Add Trade Form ---
+# Add Trade Form
 with col_add.form("Add Trade"):
     st.markdown("### Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -104,7 +120,7 @@ with col_add.form("Add Trade"):
         })
         st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# --- Delete Trade Form ---
+# Delete Trade Form
 with col_delete.form("Delete Trade"):
     st.markdown("### Delete a Trade")
     if st.session_state.trades:
@@ -125,18 +141,27 @@ st.subheader("Portfolio Overview")
 if not overview_df.empty:
     for idx, row in overview_df.iterrows():
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric(label=f"{row['Symbol']} Quantity", value=row['Quantity'])
-        col2.metric(label="Avg Cost", value=f"${row['Avg Cost']:.2f}")
-        col3.metric(label="Current Cost", value=f"${row['Current Cost']:.2f}")
+        col1.metric(label=f"{row['Symbol']} Quantity", value=f"{row['Quantity']:,}")
+        col2.metric(label="Avg Cost", value=f"${row['Avg Cost']:,.2f}")
+        col3.metric(label="Current Cost", value=f"${row['Current Cost']:,.2f}")
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
-        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:.2f}", delta=f"${unrealized_pl:.2f}")
+        delta_display = f"${unrealized_pl:,.2f}"
+        # Add color emoji for visual cue
+        if unrealized_pl < 0:
+            delta_display = f"🔴 {delta_display}"
+        elif unrealized_pl > 0:
+            delta_display = f"🟢 {delta_display}"
+        col4.metric(label="Current Value (Unrealized P/L)", value=f"${current_value:,.2f}", delta=delta_display)
 else:
     st.info("No holdings yet.")
 
 # --- Trades Table ---
 st.subheader("Trades Table")
-st.dataframe(trades_df, use_container_width=True, height=400)
+if not trades_df.empty:
+    st.dataframe(style_trades(trades_df), use_container_width=True, height=400)
+else:
+    st.info("No trades yet.")
 
 # --- Download CSV ---
 if not trades_df.empty:
