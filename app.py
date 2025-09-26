@@ -1,16 +1,9 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 from datetime import datetime
 
 # --- Page Config ---
 st.set_page_config(page_title="Stock Tracker Dashboard", layout="wide")
-
-# --- Auto Refresh ---
-refresh_interval = st.sidebar.slider("Auto-refresh interval (seconds)", 0, 300, 60)  
-# default = 60 seconds, 0 = off
-if refresh_interval > 0:
-    st_autorefresh = st.experimental_autorefresh(interval=refresh_interval * 1000, key="refresh")
 
 # --- User Info ---
 user_name = "Ali"
@@ -20,17 +13,6 @@ st.markdown("### Your Stock Portfolio Dashboard")
 # --- Initialize Session State ---
 if "trades" not in st.session_state:
     st.session_state.trades = []
-
-# --- Fetch Live Price ---
-def get_live_price(symbol):
-    try:
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(period="1d")
-        if not data.empty:
-            return float(data["Close"].iloc[-1])
-    except Exception as e:
-        st.warning(f"Live price unavailable for {symbol}: {e}")
-    return None
 
 # --- LIFO Avg Cost & P/L Logic ---
 def update_trades_lifo(trades):
@@ -87,11 +69,7 @@ def portfolio_overview(holdings):
         if total_qty == 0:
             continue
         avg_cost = sum(q*p for q,p in lots) / total_qty
-
-        # try live price first
-        live_price = get_live_price(symbol)
-        last_price = live_price if live_price else (lots[-1][1] if lots else 0)
-
+        last_price = lots[-1][1] if lots else 0
         current_value = total_qty * last_price
         current_cost = total_qty * avg_cost
         overview_data.append({
@@ -105,6 +83,7 @@ def portfolio_overview(holdings):
 
 # --- Format Trades Table ---
 def style_trades(df):
+    # Separate TOTAL row
     df_main = df[df['Symbol'] != 'TOTAL'].copy()
     df_total = df[df['Symbol'] == 'TOTAL'].copy()
 
@@ -178,14 +157,30 @@ if not overview_df.empty:
         current_value = row['Current Value']
         unrealized_pl = current_value - row['Current Cost']
 
+        # Format delta display
         if unrealized_pl < 0:
             delta_display = f"-${abs(unrealized_pl):,.2f}"
-            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta=delta_display,
+                delta_color="normal"  # red for negative, green for positive
+            )
         elif unrealized_pl > 0:
             delta_display = f"🟢 ${unrealized_pl:,.2f}"
-            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", delta_display, delta_color="normal")
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta=delta_display,
+                delta_color="normal"  # green for positive
+            )
         else:
-            col4.metric("Current Value (Unrealized P/L)", f"${current_value:,.2f}", "$0.00", delta_color="off")
+            col4.metric(
+                label="Current Value (Unrealized P/L)",
+                value=f"${current_value:,.2f}",
+                delta="$0.00",
+                delta_color="off"  # neutral gray
+            )
 else:
     st.info("No holdings yet.")
 
