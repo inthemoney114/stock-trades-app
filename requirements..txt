@@ -3,7 +3,5 @@ pandas
 yfinance
 plotly
 datetime
-plotly
 numpy
 kaleido
-yfinance
