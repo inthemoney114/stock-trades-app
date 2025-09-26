@@ -81,7 +81,18 @@ def portfolio_overview(holdings):
         })
     return pd.DataFrame(overview_data)
 
-# --- Add New Trade ---
+# --- Update Trades ---
+trades_df, holdings = update_trades_lifo(st.session_state.trades)
+
+# --- Display Portfolio Overview at Top ---
+st.subheader("Portfolio Overview")
+overview_df = portfolio_overview(holdings)
+if not overview_df.empty:
+    st.dataframe(overview_df, use_container_width=True)
+else:
+    st.info("No holdings yet.")
+
+# --- Add New Trade Form ---
 with st.form("Add Trade"):
     st.subheader("Add a Trade")
     symbol = st.text_input("Symbol").upper()
@@ -110,22 +121,6 @@ if st.session_state.trades:
 else:
     st.info("No trades to delete.")
 
-# --- Update Trades ---
-trades_df, holdings = update_trades_lifo(st.session_state.trades)
-
-# --- Display Portfolio Overview at Top ---
-st.subheader("Portfolio Overview")
-overview_df = portfolio_overview(holdings)
-if not overview_df.empty:
-    st.dataframe(overview_df, use_container_width=True)
-else:
-    st.info("No holdings yet.")
-
 # --- Display Trades Table ---
 st.subheader("Trades Table")
-st.dataframe(trades_df, use_container_width=True, height=400)
-
-# --- Download CSV ---
-if not trades_df.empty:
-    csv = trades_df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download CSV", csv, "trades.csv", "text/csv")
+st.dataframe(trades_df, us_
