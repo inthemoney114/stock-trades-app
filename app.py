@@ -1,140 +1,81 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-st.set_page_config(page_title="Stock Portfolio Tracker", layout="wide")
+st.set_page_config(page_title="Stock Tracker", layout="wide")
 
-# Initialize trades
+# Initialize session state
 if "trades" not in st.session_state:
-    st.session_state.trades = pd.DataFrame(columns=[
-        "Stock", "Action", "Quantity", "Price", "Brokerage", "Remaining"
-    ])
+    st.session_state.trades = []
 
-st.title("📈 Stock Portfolio Tracker (LIFO + P/L)")
-st.markdown("Add, track, and manage your trades with LIFO logic, average cost, and realized P/L.")
+# Helper functions
+def calculate_lifo_avg_cost(trades, symbol):
+    """
+    Calculate average cost for a given symbol using LIFO method.
+    Returns current average cost.
+    """
+    relevant_trades = [t for t in trades if t['Symbol'] == symbol]
+    position = 0
+    total_cost = 0
+    for trade in reversed(relevant_trades):
+        if trade['Type'] == "Buy":
+            qty_to_add = min(trade['Quantity'], position) if position > 0 else trade['Quantity']
+            total_cost += qty_to_add * trade['Price']
+            position += trade['Quantity']
+        elif trade['Type'] == "Sell":
+            position -= trade['Quantity']
+    return round(total_cost / position, 2) if position != 0 else 0
 
-# ---- Add a Trade ----
-st.header("Add a Trade")
-with st.form("trade_form"):
-    stock = st.text_input("Stock Symbol")
-    action = st.selectbox("Action", ["Buy", "Sell"])
-    qty = st.number_input("Quantity", min_value=1, step=1)
-    price = st.number_input("Price per Share", min_value=0.0, step=0.01)
-    brokerage = st.number_input("Brokerage ($)", min_value=0.0, step=0.01, value=0.0)
-    submitted = st.form_submit_button("Submit Trade")
-    
+def update_trades():
+    df = pd.DataFrame(st.session_state.trades)
+    if not df.empty:
+        df['Total'] = df['Quantity'] * df['Price']
+        df['Avg Cost'] = df.apply(lambda x: calculate_lifo_avg_cost(st.session_state.trades, x['Symbol']), axis=1)
+        df['P/L'] = df.apply(lambda x: (x['Price'] - x['Avg Cost']) * x['Quantity'] if x['Type']=="Sell" else 0, axis=1)
+        df.loc['Total'] = df[['Quantity', 'Total', 'P/L']].sum()
+        df.at['Total', 'Symbol'] = "TOTAL"
+        df.at['Total', 'Type'] = "-"
+        df.at['Total', 'Price'] = "-"
+        df.at['Total', 'Avg Cost'] = "-"
+    else:
+        df = pd.DataFrame()
+    return df
+
+# Add new trade
+with st.form("Add Trade"):
+    st.subheader("Add a Trade")
+    symbol = st.text_input("Symbol").upper()
+    trade_type = st.selectbox("Type", ["Buy", "Sell"])
+    quantity = st.number_input("Quantity", min_value=1, step=1)
+    price = st.number_input("Price", min_value=0.01, step=0.01, format="%.2f")
+    date = st.date_input("Date", datetime.today())
+    submitted = st.form_submit_button("Add Trade")
     if submitted:
-        remaining = qty if action == "Buy" else 0
-        new_trade = pd.DataFrame({
-            "Stock": [stock],
-            "Action": [action],
-            "Quantity": [qty],
-            "Price": [price],
-            "Brokerage": [brokerage],
-            "Remaining": [remaining]
+        st.session_state.trades.append({
+            "Symbol": symbol,
+            "Type": trade_type,
+            "Quantity": quantity,
+            "Price": price,
+            "Date": date
         })
-        st.session_state.trades = pd.concat([st.session_state.trades, new_trade], ignore_index=True)
-        st.success(f"{action} trade added: {qty} shares of {stock} at ${price} with ${brokerage} brokerage")
+        st.success(f"Trade added: {symbol} {trade_type} {quantity} @ {price}")
 
-# ---- Process LIFO sells and calculate Progressive Avg Cost + P/L ----
-trades_df = st.session_state.trades.copy()
-trades_df["Progressive Avg Cost"] = 0.0
-trades_df["P/L"] = 0.0
+# Delete trade
+st.subheader("Delete a Trade")
+if st.session_state.trades:
+    delete_index = st.number_input("Trade index to delete", min_value=0, max_value=len(st.session_state.trades)-1, step=1)
+    if st.button("Delete Trade"):
+        removed = st.session_state.trades.pop(delete_index)
+        st.warning(f"Deleted trade: {removed}")
+else:
+    st.info("No trades to delete.")
 
-for stock in trades_df["Stock"].unique():
-    # Get buys and sells
-    buys = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Buy")].copy()
-    sells = trades_df[(trades_df["Stock"]==stock) & (trades_df["Action"]=="Sell")].copy()
-    
-    # LIFO: reverse buys
-    buys = buys.iloc[::-1]
+# Show trades
+st.subheader("Trades Table")
+trades_df = update_trades()
+st.dataframe(trades_df, use_container_width=True, height=400)
 
-    # Process sells against buys
-    for _, sell in sells.iterrows():
-        qty_to_sell = sell["Quantity"]
-        cost_for_sell = 0.0
-        for bidx, buy in buys.iterrows():
-            available = buy["Remaining"]
-            if available <= 0:
-                continue
-            used_qty = min(qty_to_sell, available)
-            avg_cost = buy["Price"] + buy["Brokerage"]/buy["Quantity"]
-            cost_for_sell += used_qty * avg_cost
-            buys.at[bidx, "Remaining"] -= used_qty
-            qty_to_sell -= used_qty
-            if qty_to_sell <= 0:
-                break
-        trades_df.at[sell.name, "Progressive Avg Cost"] = cost_for_sell / sell["Quantity"] if sell["Quantity"]>0 else 0
-        trades_df.at[sell.name, "P/L"] = (sell["Price"] - trades_df.at[sell.name, "Progressive Avg Cost"]) * sell["Quantity"] - sell["Brokerage"]
-    
-    # Update remaining buys in main df
-    trades_df.loc[buys.index, "Remaining"] = buys["Remaining"]
-    
-    # Progressive Avg Cost for buys
-    total_qty = 0
-    total_cost = 0.0
-    for idx, row in buys.iterrows():
-        if row["Remaining"] > 0:
-            lot_qty = row["Remaining"]
-            lot_cost = lot_qty * (row["Price"] + row["Brokerage"]/row["Quantity"])
-            total_qty += lot_qty
-            total_cost += lot_cost
-            trades_df.at[idx, "Progressive Avg Cost"] = total_cost / total_qty
-
-# ---- Display table with delete buttons and total row ----
-st.header("Portfolio Trades")
+# Download option
 if not trades_df.empty:
-    headers = ["Stock","Action","Quantity","Price","Brokerage","Remaining","Avg Cost","P/L","Delete"]
-    col_widths = [1.5,1,1,1,1,1,1,1,0.5]
-    
-    # Header row
-    cols = st.columns(col_widths)
-    for col, header in zip(cols, headers):
-        col.markdown(f"**{header}**")
-    
-    # Trade rows
-    for idx, row in trades_df.iterrows():
-        cols = st.columns(col_widths)
-        cols[0].write(row['Stock'])
-        cols[1].write(row['Action'])
-        cols[2].write(row['Quantity'])
-        cols[3].write(f"${row['Price']:.2f}")
-        cols[4].write(f"${row['Brokerage']:.2f}")
-        cols[5].write(row['Remaining'])
-        cols[6].write(f"${row['Progressive Avg Cost']:.2f}")
-        cols[7].write(f"${row['P/L']:.2f}")
-        if cols[8].button("Delete", key=f"del_{idx}"):
-            st.session_state.trades.drop(index=idx, inplace=True)
-            st.session_state.trades.reset_index(drop=True, inplace=True)
-            st.experimental_rerun()
-    
-    # Total row (Remaining qty and invested for buys)
-    total_qty = trades_df[trades_df["Action"]=="Buy"]["Remaining"].sum()
-    total_invested = (trades_df[trades_df["Action"]=="Buy"]["Remaining"] * 
-                      (trades_df[trades_df["Action"]=="Buy"]["Price"] + 
-                       trades_df[trades_df["Action"]=="Buy"]["Brokerage"]/trades_df[trades_df["Action"]=="Buy"]["Quantity"])
-                     ).sum()
-    
-    total_cols = st.columns(col_widths)
-    total_cols[0].markdown("**TOTAL**")
-    total_cols[1].write("")
-    total_cols[2].write("")
-    total_cols[3].write("")
-    total_cols[4].write("")
-    total_cols[5].markdown(f"**{total_qty}**")
-    total_cols[6].markdown(f"**${total_invested:.2f}**")
-    total_cols[7].write("")  # P/L total optional
-    total_cols[8].write("")
-else:
-    st.write("No trades yet.")
-
-# ---- Portfolio Metrics ----
-st.header("Portfolio Metrics")
-remaining_buys = trades_df[(trades_df["Action"]=="Buy") & (trades_df["Remaining"]>0)]
-if not remaining_buys.empty:
-    total_qty = remaining_buys["Remaining"].sum()
-    total_invested = (remaining_buys["Remaining"] * (remaining_buys["Price"] + remaining_buys["Brokerage"]/remaining_buys["Quantity"])).sum()
-else:
-    total_qty = total_invested = 0
-
-st.metric("Total Shares Remaining", f"{total_qty}")
-st.metric("Total Invested ($)", f"${total_invested:,.2f}")
+    csv = trades_df.to_csv(index=False).encode('utf-8')
+    st.download_button("Download CSV", csv, "trades.csv", "text/csv")
